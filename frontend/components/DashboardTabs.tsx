@@ -9,6 +9,23 @@ import type { BalanceEntry, Market, Order } from "@/lib/types";
 
 type Tab = "position" | "open" | "history";
 
+const OPEN_STATUSES = new Set(["open", "partial_filled"]);
+const HISTORY_STATUSES = new Set([
+  "filled",
+  "cancelled",
+  "canceled",
+  "rejected",
+  "failed",
+]);
+
+function isOpenOrderStatus(status: string): boolean {
+  return OPEN_STATUSES.has(status.trim().toLowerCase());
+}
+
+function isHistoryOrderStatus(status: string): boolean {
+  return HISTORY_STATUSES.has(status.trim().toLowerCase());
+}
+
 const tabs: { id: Tab; label: string }[] = [
   { id: "position", label: "Position" },
   { id: "open", label: "Open Orders" },
@@ -36,13 +53,8 @@ export default function DashboardTabs({
   markets: Market[];
   error: string | null;
 }) {
-  const openOrders = orders.filter((o) => o.status === "open");
-  const historyOrders = orders.filter(
-    (o) =>
-      o.status === "filled" ||
-      o.status === "cancelled" ||
-      o.status === "partial_filled",
-  );
+  const openOrders = orders.filter((o) => isOpenOrderStatus(o.status));
+  const historyOrders = orders.filter((o) => isHistoryOrderStatus(o.status));
   const positions = getPositionBalances(balances, markets);
 
   return (
@@ -128,7 +140,6 @@ export default function DashboardTabs({
           orders={historyOrders}
           emptyMessage="No order history."
           showError={!!error}
-          cancelStatuses={["partial_filled"]}
         />
       )}
     </div>

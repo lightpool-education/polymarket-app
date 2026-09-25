@@ -767,6 +767,7 @@ pub fn resolve_placed_order_from_receipt(
             };
             return Some(ResolvedPlaceOrder {
                 created: OrderCreatedEvent {
+                    cloid: None,
                     order_id: exec.order_id,
                     side: exec.side,
                     amount: exec.amount,
@@ -792,6 +793,7 @@ pub fn resolve_placed_order_from_receipt(
         };
         return Some(ResolvedPlaceOrder {
             created: OrderCreatedEvent {
+                cloid: None,
                 order_id: filled.order_id,
                 side: filled.side,
                 amount,

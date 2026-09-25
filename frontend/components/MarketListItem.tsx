@@ -17,50 +17,37 @@ function formatYesRate(yesRate?: string | null): string {
 
 export function MarketListItem({ market }: { market: Market }) {
   return (
-    <article className="rounded-xl border border-sky-100 bg-white p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md">
-      <div className="flex items-start justify-between gap-4">
-        <Link href={`/markets/${market.slug}`} className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <MarketIcon iconUrl={market.icon_url} question={market.question} size="md" />
-            <div className="min-w-0">
-              <h2 className="text-lg font-medium text-slate-900">{market.question}</h2>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="break-all font-mono text-xs text-slate-500">
-                  {market.market_address}
-                </span>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium capitalize text-emerald-700">
-                  {market.state}
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Deadline: {new Date(market.resolution_deadline * 1000).toLocaleString()}
-              </p>
+    <article className="w-full rounded-2xl border border-brand-line bg-gradient-to-b from-brand-panel-2 to-brand-panel transition hover:border-brand-gold-dim">
+      <Link
+        href={`/markets/${market.slug}`}
+        className="flex items-start justify-between gap-4 px-5 py-5"
+      >
+        <div className="flex min-w-0 flex-1 items-start gap-3.5">
+          <MarketIcon iconUrl={market.icon_url} question={market.question} size="md" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[1.15rem] font-semibold tracking-[-0.02em] text-brand-text">
+              {market.question}
+            </h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="break-all font-mono text-xs text-brand-muted">
+                {market.market_address}
+              </span>
+              <span className="rounded-full border border-brand-line px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-gold-dim">
+                {market.state}
+              </span>
             </div>
-          </div>
-        </Link>
-
-        <div className="flex shrink-0 flex-col items-end gap-2 self-end">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-right">
-            <span className="text-2xl font-semibold tabular-nums text-slate-900">
-              {formatYesRate(market.yes_rate)}
-            </span>
-          </div>
-          <div className="grid min-w-[280px] grid-cols-2 gap-2">
-            <Link
-              href={`/markets/${market.slug}/mint-burn?tab=mint`}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center transition hover:bg-emerald-100"
-            >
-              <span className="block text-xs font-medium text-emerald-700">Mint</span>
-            </Link>
-            <Link
-              href={`/markets/${market.slug}/mint-burn?tab=burn`}
-              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-center transition hover:bg-rose-100"
-            >
-              <span className="block text-xs font-medium text-rose-700">Burn</span>
-            </Link>
+            <p className="mt-2 text-xs text-brand-muted">
+              Deadline: {new Date(market.resolution_deadline * 1000).toLocaleString()}
+            </p>
           </div>
         </div>
-      </div>
+
+        <div className="shrink-0 self-end text-right">
+          <span className="text-[1.85rem] font-semibold tabular-nums tracking-[-0.04em] text-brand-yes">
+            {formatYesRate(market.yes_rate)}
+          </span>
+        </div>
+      </Link>
     </article>
   );
 }

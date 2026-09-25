@@ -190,7 +190,7 @@ function SpreadSection({
   tickSize: string;
 }) {
   return (
-    <div className="my-2 border-y border-slate-100 py-2">
+    <div className="my-2 border-y border-brand-line py-2">
       <table className="w-full table-fixed border-collapse">
         <tbody>
           <tr>
@@ -264,9 +264,9 @@ export function OrderBook({
   );
 
   return (
-    <section className="rounded-xl border border-sky-100 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">Order Book</h2>
+    <section className="rounded-2xl border border-brand-line bg-gradient-to-b from-brand-panel-2 to-brand-panel">
+      <div className="border-b border-brand-line px-5 py-3">
+        <h2 className="text-sm font-semibold text-brand-text">Order Book</h2>
       </div>
 
       <div className="px-5 py-4">

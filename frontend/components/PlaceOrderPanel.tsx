@@ -38,8 +38,8 @@ function TabItem({
       className={[
         "border-b-2 pb-2 text-sm font-medium transition",
         active
-          ? "border-sky-500 text-slate-900"
-          : "border-transparent text-slate-500 hover:text-slate-800",
+          ? "border-brand-gold text-brand-text"
+          : "border-transparent text-brand-muted hover:text-brand-text",
       ].join(" ")}
     >
       {label}
@@ -63,14 +63,14 @@ function OrderTypeToggle({
       type="button"
       aria-label={`Switch to ${value === "limit" ? "market" : "limit"} order`}
       onClick={toggleOrderType}
-      className="inline-flex cursor-pointer items-center pb-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+      className="inline-flex cursor-pointer items-center pb-2 text-sm font-medium text-brand-muted hover:text-brand-text"
     >
       <span>{value === "limit" ? "Limit" : "Market"}</span>
       <svg
         aria-hidden="true"
         viewBox="0 0 20 20"
         fill="currentColor"
-        className="ml-[2ch] h-3.5 w-3.5 shrink-0 text-slate-500"
+        className="ml-[2ch] h-3.5 w-3.5 shrink-0 text-brand-muted"
       >
         <path
           fillRule="evenodd"
@@ -103,8 +103,8 @@ export function PlaceOrderPanel({
       : `Sell ${outcome === "yes" ? "Yes" : "No"}`;
 
   return (
-    <section className="sticky top-6 rounded-xl border border-sky-100 bg-white p-5 shadow-sm">
-      <div className="mb-5 flex items-end justify-between border-b border-slate-200">
+    <section className="sticky top-6 rounded-2xl border border-brand-line bg-gradient-to-b from-brand-panel-2 to-brand-panel p-5">
+      <div className="mb-5 flex items-end justify-between border-b border-brand-line">
         <div className="flex gap-5">
           <TabItem label="Buy" active={side === "buy"} onClick={() => onSideChange("buy")} />
           <TabItem label="Sell" active={side === "sell"} onClick={() => onSideChange("sell")} />
@@ -115,7 +115,7 @@ export function PlaceOrderPanel({
       <form onSubmit={onSubmit} className="space-y-4">
         {orderType === "limit" && (
           <label className="block text-sm">
-            <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-brand-muted">
               Limit price (¢)
             </span>
             <input
@@ -124,7 +124,7 @@ export function PlaceOrderPanel({
               max="100"
               step="any"
               inputMode="decimal"
-              className="w-full rounded-lg border border-sky-100 px-3 py-2.5 tabular-nums outline-none ring-sky-200 focus:border-sky-400 focus:ring-2"
+              className="w-full rounded-lg border border-brand-line bg-brand-bg px-3 py-2.5 text-brand-text tabular-nums outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold"
               value={price}
               onChange={(e) => onPriceChange(e.target.value)}
             />
@@ -133,14 +133,14 @@ export function PlaceOrderPanel({
 
         <div>
           <label className="block text-sm">
-            <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-brand-muted">
               Amount
             </span>
             <input
               type="number"
               min="0"
               step="0.000001"
-              className="w-full rounded-lg border border-sky-100 px-3 py-2.5 outline-none ring-sky-200 focus:border-sky-400 focus:ring-2"
+              className="w-full rounded-lg border border-brand-line bg-brand-bg px-3 py-2.5 text-brand-text outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold"
               value={size}
               onChange={(e) => onSizeChange(e.target.value)}
             />
@@ -151,7 +151,7 @@ export function PlaceOrderPanel({
                 key={amount}
                 type="button"
                 onClick={() => onSizeChange(String(amount))}
-                className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                className="rounded-full border border-brand-gold-dim px-3 py-1 text-xs font-medium text-brand-gold hover:bg-[#22c55e14]"
               >
                 {amount}
               </button>
@@ -164,14 +164,16 @@ export function PlaceOrderPanel({
           disabled={loading}
           className={[
             "w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition disabled:opacity-50",
-            side === "buy" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600",
+            side === "buy"
+              ? "bg-brand-yes hover:brightness-110"
+              : "bg-brand-no hover:brightness-110",
           ].join(" ")}
         >
           {loading ? "Submitting..." : submitLabel}
         </button>
       </form>
 
-      {message && <p className="mt-3 text-sm text-slate-600">{message}</p>}
+      {message && <p className="mt-3 text-sm text-brand-muted">{message}</p>}
     </section>
   );
 }

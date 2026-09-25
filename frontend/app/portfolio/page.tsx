@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import DashboardTabs from "@/components/DashboardTabs";
+import { createUserOrdersSubscription } from "@/lib/clob";
 import {
   getSessionToken,
   SESSION_CHANGED_EVENT,
@@ -72,6 +73,40 @@ function PortfolioClient() {
       window.removeEventListener(SESSION_CHANGED_EVENT, onRefresh);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!getSessionToken()) {
+      return;
+    }
+
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+
+    async function startOrdersWs() {
+      try {
+        const account = await api.getAccount();
+        if (cancelled) {
+          return;
+        }
+        unsubscribe = createUserOrdersSubscription(account.address, {
+          onOrders: (nextOrders) => {
+            setOrders(nextOrders);
+          },
+          onError: (err) => {
+            setError(err.message);
+          },
+        });
+      } catch {
+        // Keep HTTP snapshot when WS setup fails.
+      }
+    }
+
+    void startOrdersWs();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
 
   if (!getSessionToken() && !loading) {
     return (

@@ -270,8 +270,26 @@ impl ClobIndexClient {
     }
 
     pub async fn list_orders(&self, user_address: &str) -> AppResult<Vec<Order>> {
-        self.get_json(&format!("/api/orders?user_address={user_address}"))
+        let q = format!("user_address={user_address}");
+        let open: Vec<Order> = match self
+            .get_json(&format!("/api/orders/openOrders?{q}"))
             .await
+        {
+            Ok(orders) => orders,
+            Err(_) => self.get_json(&format!("/api/orders?{q}")).await?,
+        };
+        let historical: Vec<Order> = self
+            .get_json(&format!("/api/orders/historicalOrders?{q}"))
+            .await
+            .unwrap_or_default();
+        let mut by_id = std::collections::HashMap::new();
+        for order in historical {
+            by_id.insert(order.id, order);
+        }
+        for order in open {
+            by_id.insert(order.id, order);
+        }
+        Ok(by_id.into_values().collect())
     }
 
     pub async fn mark_order_cancelled(

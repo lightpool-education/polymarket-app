@@ -3,15 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --brand-50: #f0f9ff;
-  --brand-100: #e0f2fe;
-  --brand-500: #0ea5e9;
-  --brand-600: #0284c7;
-  --brand-700: #0369a1;
+  --brand-bg: #ffffff;
+  --brand-panel: #ffffff;
+  --brand-panel-2: #fafafa;
+  --brand-line: #e5e5e5;
+  --brand-text: #111111;
+  --brand-muted: #6b6b6b;
+  --brand-gold: #22c55e;
+  --brand-gold-dim: #16a34a;
+  --brand-yes: #22c55e;
+  --brand-no: #f04438;
+}
+
+html {
+  color-scheme: light;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  background-color: var(--brand-50);
-  color: #0f172a;
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  color: var(--brand-text);
+  background: var(--brand-bg);
+}
+
+.font-display {
+  font-family: var(--font-display), "Newsreader", Georgia, serif;
+}
+
+input,
+textarea,
+select {
+  color-scheme: light;
 }

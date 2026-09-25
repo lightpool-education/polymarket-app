@@ -7,7 +7,7 @@ type MarketIconProps = {
 
 const sizeClasses = {
   sm: "h-10 w-10 text-sm",
-  md: "h-12 w-12 text-base",
+  md: "h-11 w-11 text-base",
   lg: "h-14 w-14 text-lg",
 };
 
@@ -25,7 +25,11 @@ export function MarketIcon({
       <img
         src={iconUrl}
         alt=""
-        className={["shrink-0 rounded-lg object-cover", sizeClass, className].join(" ")}
+        className={[
+          "shrink-0 rounded-full object-cover ring-1 ring-brand-gold-dim",
+          sizeClass,
+          className,
+        ].join(" ")}
       />
     );
   }
@@ -33,7 +37,7 @@ export function MarketIcon({
   return (
     <div
       className={[
-        "flex shrink-0 items-center justify-center rounded-lg bg-sky-100 font-semibold text-sky-700",
+        "flex shrink-0 items-center justify-center rounded-full border border-brand-gold-dim font-semibold text-brand-gold",
         sizeClass,
         className,
       ].join(" ")}

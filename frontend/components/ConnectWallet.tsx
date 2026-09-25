@@ -190,11 +190,11 @@ export function ConnectWallet() {
       <div className="flex flex-col items-end gap-1">
         <button
           type="button"
-          className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
+          className="rounded-full border border-brand-gold-dim px-4 py-2 text-xs font-semibold text-brand-gold transition hover:border-brand-gold hover:bg-[#22c55e14]"
           disabled={isPending || busy}
           onClick={() => void onConnectClick()}
         >
-          {isPending || busy ? "Connecting…" : "Connect MetaMask"}
+          {isPending || busy ? "Connecting…" : "Connect wallet"}
         </button>
         {error && (
           <p className="max-w-xs text-right text-[11px] text-red-600">{error}</p>
@@ -228,7 +228,7 @@ export function ConnectWallet() {
         ) : needsAgent ? (
           <button
             type="button"
-            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+            className="rounded-full border border-brand-gold-dim px-3 py-1.5 text-xs font-medium text-brand-gold hover:bg-[#22c55e14]"
             disabled={busy}
             onClick={() => void onAuthorizeAgentClick()}
           >
@@ -237,17 +237,17 @@ export function ConnectWallet() {
         ) : loggedIn && agentAuthorized === true ? (
           <button
             type="button"
-            className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center transition hover:bg-emerald-100"
+            className="rounded-full border border-brand-gold-dim px-3 py-2 text-center transition hover:bg-[#22c55e14]"
             onClick={onDeposit}
           >
-            <span className="block text-xs font-medium text-emerald-700">
+            <span className="block text-xs font-medium text-brand-gold">
               Deposit
             </span>
           </button>
         ) : (
           <button
             type="button"
-            className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
+            className="rounded-full border border-brand-gold-dim px-3 py-1.5 text-xs font-semibold text-brand-gold hover:bg-[#22c55e14]"
             disabled={busy}
             onClick={() => void login()}
           >
@@ -256,7 +256,7 @@ export function ConnectWallet() {
         )}
         <button
           type="button"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-mono text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+          className="rounded-full border border-brand-line px-3 py-1.5 font-mono text-xs font-medium text-brand-muted hover:border-brand-gold-dim hover:text-brand-gold"
           title={copied ? "Copied" : `Click to copy ${address}`}
           onClick={() => void onCopyAddress()}
         >
@@ -268,7 +268,7 @@ export function ConnectWallet() {
           <p className="text-right text-[11px] text-red-600">{error}</p>
           <button
             type="button"
-            className="text-[11px] text-sky-700 underline"
+            className="text-[11px] text-brand-gold underline"
             disabled={busy}
             onClick={() => {
               loginAttemptedFor.current = null;

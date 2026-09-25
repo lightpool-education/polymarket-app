@@ -90,6 +90,8 @@ export type Order = {
   user_address?: string;
   size_raw?: number;
   filled_raw?: number;
+  /** Archive time from indexer (unix ms). */
+  status_ts_ms?: number;
 };
 
 export type BalanceEntry = {

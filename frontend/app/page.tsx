@@ -24,11 +24,12 @@ export default async function HomePage() {
         </div>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid w-full gap-4">
         {entries.map((entry) =>
           entry.kind === "group" ? (
             <EventMarketGroup
               key={`event:${entry.eventSlug}`}
+              title={entry.title}
               eventSlug={entry.eventSlug}
               markets={entry.markets}
             />
@@ -38,7 +39,7 @@ export default async function HomePage() {
         )}
 
         {!error && entries.length === 0 && (
-          <p className="text-sm text-slate-500">No markets yet.</p>
+          <p className="text-sm text-brand-muted">No markets yet.</p>
         )}
       </div>
     </div>

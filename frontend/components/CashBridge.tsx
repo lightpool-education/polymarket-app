@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   useAccount,
   usePublicClient,
-  useWalletClient,
   useSwitchChain,
   useWaitForTransactionReceipt,
   useSignTypedData,
@@ -14,6 +13,7 @@ import {
 import { encodeFunctionData, parseUnits, type Hex } from "viem";
 import { api, type BridgeConfig } from "@/lib/api";
 import { bridgeAbi, erc20Abi } from "@/lib/bridgeAbi";
+import { readAllowance, sendAndWait } from "@/lib/evmSend";
 import {
   compactRsFromEthereumSignature,
   lightPoolTypedDataFromPrepared,
@@ -25,30 +25,6 @@ import type { BalanceEntry } from "@/lib/types";
 import { lightpoolLocal } from "@/lib/wallet";
 
 type BridgeDialogKind = "deposit" | "withdraw";
-
-async function ethSendTransaction(
-  walletRequest: (args: {
-    method: "eth_sendTransaction";
-    params: [
-      {
-        from: Hex;
-        to: Hex;
-        data: Hex;
-        gas: Hex;
-      },
-    ];
-  }) => Promise<unknown>,
-  params: { from: Hex; to: Hex; data: Hex; gas: Hex },
-): Promise<Hex> {
-  const hash = await walletRequest({
-    method: "eth_sendTransaction",
-    params: [params],
-  });
-  if (typeof hash !== "string" || !hash.startsWith("0x")) {
-    throw new Error("MetaMask did not return a transaction hash");
-  }
-  return hash as Hex;
-}
 
 function AmountDialog({
   kind,
@@ -101,13 +77,13 @@ function AmountDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cash-bridge-dialog-title"
-        className="w-full max-w-md rounded-2xl border border-sky-100 bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-2xl border border-brand-line bg-brand-panel p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
           <h3
             id="cash-bridge-dialog-title"
-            className="text-lg font-semibold text-slate-900"
+            className="text-lg font-semibold text-brand-text"
           >
             {title}
           </h3>
@@ -115,7 +91,7 @@ function AmountDialog({
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+            className="rounded-lg px-2 py-1 text-sm text-brand-muted hover:bg-brand-panel-2 hover:text-brand-text disabled:opacity-50"
           >
             Close
           </button>
@@ -125,7 +101,7 @@ function AmountDialog({
           <div>
             <input
               id="cash-bridge-amount"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-brand-line bg-white px-3 py-2 text-sm text-brand-text outline-none placeholder:text-brand-muted focus:border-brand-yes focus:ring-1 focus:ring-brand-yes"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Amount"
@@ -135,18 +111,18 @@ function AmountDialog({
           </div>
           {(progress || hint) && (
             <div className="space-y-1 text-sm">
-              {progress && <p className="text-sky-700">{progress}</p>}
-              {hint && <p className="text-amber-700">{hint}</p>}
+              {progress && <p className="text-brand-yes">{progress}</p>}
+              {hint && <p className="text-amber-800">{hint}</p>}
             </div>
           )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-brand-no">{error}</p>}
           <button
             type="submit"
             disabled={busy || !amount.trim()}
             className={
               kind === "deposit"
-                ? "w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-                : "w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                ? "w-full rounded-xl bg-brand-yes px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
+                : "w-full rounded-xl bg-brand-no px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
             }
           >
             {buttonLabel}
@@ -160,7 +136,6 @@ function AmountDialog({
 export function CashBridge() {
   const { address, isConnected, chainId } = useAccount();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
   const { signTypedDataAsync } = useSignTypedData();
   const router = useRouter();
@@ -336,10 +311,6 @@ export function CashBridge() {
       setError("Connect MetaMask first");
       return;
     }
-    if (!walletClient) {
-      setError("MetaMask wallet client not ready. Reconnect MetaMask.");
-      return;
-    }
     if (!config?.eth_usdt || !config.bridge) {
       setError("Bridge config incomplete (ETH_USDT / BRIDGE)");
       return;
@@ -374,28 +345,27 @@ export function CashBridge() {
         await switchChainAsync({ chainId: expectedChainId });
       }
 
-      // Bypass wagmi/viem gas simulation (it can hang on local RPC) and open MetaMask directly.
-      const approveData = encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [bridge, amountU64],
+      const allowance = await readAllowance({
+        token,
+        owner: from,
+        spender: bridge,
       });
-      flushSync(() => {
-        setStatus("Confirm approve in MetaMask…");
-      });
-      const approveHash = await ethSendTransaction(
-        (args) => walletClient.request(args as never),
-        {
+      if (allowance < amountU64) {
+        const approveData = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [bridge, amountU64],
+        });
+        flushSync(() => {
+          setStatus("Confirm approve in MetaMask…");
+        });
+        await sendAndWait({
           from,
           to: token,
           data: approveData,
           gas: "0x7a120",
-        },
-      );
-      flushSync(() => {
-        setStatus("Waiting for approve confirmation…");
-      });
-      await publicClient?.waitForTransactionReceipt({ hash: approveHash });
+        });
+      }
 
       const depositData = encodeFunctionData({
         abi: bridgeAbi,
@@ -405,15 +375,12 @@ export function CashBridge() {
       flushSync(() => {
         setStatus("Confirm deposit in MetaMask…");
       });
-      const depositHash = await ethSendTransaction(
-        (args) => walletClient.request(args as never),
-        {
-          from,
-          to: bridge,
-          data: depositData,
-          gas: "0xf4240",
-        },
-      );
+      const depositHash = await sendAndWait({
+        from,
+        to: bridge,
+        data: depositData,
+        gas: "0xf4240",
+      });
       setPendingTx(depositHash);
       mintBaselineRef.current = lpAvailable(balances);
       flushSync(() => {
@@ -421,7 +388,6 @@ export function CashBridge() {
         setPollHint(null);
         setAwaitingMint(true);
       });
-      // Keep dialog open; busy stays true until mint poll finishes.
     } catch (e) {
       const message = e instanceof Error ? e.message : "Deposit failed";
       setError(message);

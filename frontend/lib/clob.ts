@@ -35,6 +35,7 @@ type UserOrderWsMessage = {
   price: string;
   size: string;
   status: string;
+  spot_market?: string;
 };
 
 type UserTradeWsMessage = {
@@ -52,6 +53,23 @@ type UserTradeWsMessage = {
   spot_market: string;
   block_num: number;
 };
+
+const OPEN_STATUSES = new Set(["open", "partial_filled"]);
+const HISTORY_STATUSES = new Set([
+  "filled",
+  "cancelled",
+  "canceled",
+  "rejected",
+  "failed",
+]);
+
+export function isOpenStatus(status: string): boolean {
+  return OPEN_STATUSES.has(status.trim().toLowerCase());
+}
+
+export function isHistoryStatus(status: string): boolean {
+  return HISTORY_STATUSES.has(status.trim().toLowerCase());
+}
 
 function spotMarketPath(spotMarket: string): string {
   return encodeURIComponent(spotMarket);
@@ -143,16 +161,26 @@ function orderFromUserMessage(message: UserOrderWsMessage): Order {
     size: message.size,
     status: message.status,
     chain_order_id: message.chain_order_id,
+    spot_market: message.spot_market,
     user_address: message.user_address,
   };
 }
 
 export function upsertOrder(orders: Order[], order: Order): Order[] {
-  const index = orders.findIndex((item) => item.id === order.id);
+  const index = orders.findIndex(
+    (item) =>
+      item.id === order.id ||
+      (item.chain_order_id &&
+        order.chain_order_id &&
+        item.chain_order_id === order.chain_order_id &&
+        (item.spot_market ?? "") === (order.spot_market ?? "")),
+  );
   if (index >= 0) {
-    return orders.map((item, itemIndex) => (itemIndex === index ? order : item));
+    return orders.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, ...order } : item,
+    );
   }
-  return [...orders, order];
+  return [order, ...orders];
 }
 
 export function applyUserOrderEvent(
@@ -166,30 +194,89 @@ export function applyUserTradeEvent(
   orders: Order[],
   message: UserTradeWsMessage,
 ): Order[] {
-  return orders.map((order) => {
-    if (order.id !== message.order_id) {
-      return order;
-    }
-    return {
-      ...order,
-      size: message.remaining_amount,
-      status: message.is_fully_filled ? "filled" : "partial_filled",
-    };
+  const existing = orders.find((order) => order.id === message.order_id);
+  if (existing) {
+    return orders.map((order) => {
+      if (order.id !== message.order_id) {
+        return order;
+      }
+      return {
+        ...order,
+        size: message.remaining_amount,
+        status: message.is_fully_filled ? "filled" : "partial_filled",
+        price: message.price || order.price,
+        spot_market: message.spot_market || order.spot_market,
+      };
+    });
+  }
+  // Market fills often skip order_created; seed a history row from the trade WS.
+  return upsertOrder(orders, {
+    id: message.order_id,
+    market_id: "",
+    market_slug: message.market_slug ?? "",
+    question: "",
+    outcome: message.outcome ?? "",
+    side: message.side ?? "—",
+    price: message.price ?? "—",
+    size: message.fill_amount,
+    status: message.is_fully_filled ? "filled" : "partial_filled",
+    chain_order_id: message.chain_order_id,
+    spot_market: message.spot_market,
+    user_address: message.user_address,
   });
 }
 
-export async function fetchUserOrders(userAddress: string): Promise<Order[]> {
-  const res = await fetch(
-    `${CLOB_INDEX_URL}/api/orders?user_address=${encodeURIComponent(userAddress)}`,
-    { cache: "no-store" },
-  );
-
+async function parseOrdersResponse(res: Response): Promise<Order[]> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Failed to load orders: ${res.status}`);
+    throw new Error(
+      (body as { error?: string }).error ?? `Failed to load orders: ${res.status}`,
+    );
   }
-
   return res.json() as Promise<Order[]>;
+}
+
+/** Live open / partial orders (hot index). */
+export async function fetchOpenOrders(userAddress: string): Promise<Order[]> {
+  const q = `user_address=${encodeURIComponent(userAddress)}`;
+  const res = await fetch(`${CLOB_INDEX_URL}/api/orders/openOrders?${q}`, {
+    cache: "no-store",
+  });
+  if (res.status === 404) {
+    const fallback = await fetch(`${CLOB_INDEX_URL}/api/orders?${q}`, {
+      cache: "no-store",
+    });
+    return parseOrdersResponse(fallback);
+  }
+  return parseOrdersResponse(res);
+}
+
+/** Terminal orders from sqlite history (filled / cancelled / …). */
+export async function fetchHistoricalOrders(
+  userAddress: string,
+): Promise<Order[]> {
+  const q = `user_address=${encodeURIComponent(userAddress)}`;
+  const res = await fetch(
+    `${CLOB_INDEX_URL}/api/orders/historicalOrders?${q}`,
+    { cache: "no-store" },
+  );
+  return parseOrdersResponse(res);
+}
+
+/** Open + historical orders for portfolio / market detail. */
+export async function fetchUserOrders(userAddress: string): Promise<Order[]> {
+  const [open, historical] = await Promise.all([
+    fetchOpenOrders(userAddress),
+    fetchHistoricalOrders(userAddress),
+  ]);
+  const byId = new Map<string, Order>();
+  for (const order of historical) {
+    byId.set(order.id, order);
+  }
+  for (const order of open) {
+    byId.set(order.id, order);
+  }
+  return Array.from(byId.values());
 }
 
 export async function fetchMarketInfo(

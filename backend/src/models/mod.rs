@@ -65,6 +65,8 @@ pub struct Order {
     pub size_raw: u64,
     #[serde(default)]
     pub filled_raw: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub status_ts_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,4 +249,8 @@ pub struct VaultDepositWithdrawResponse {
     pub amount: String,
     pub shares: String,
     pub tx_digest: String,
+}
+
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
 }

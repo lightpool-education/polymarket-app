@@ -113,6 +113,7 @@ async fn place_order(
     let account = parse_address(&record.lp_address)?;
 
     let params = PlaceOrderParams {
+        cloid: None,
         side,
         amount,
         order_type,

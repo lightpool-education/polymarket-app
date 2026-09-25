@@ -267,13 +267,11 @@ export default function MarketDetailClient({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
         <MarketOutcomeSelector
           question={initialMarket.question}
           iconUrl={initialMarket.icon_url}
-          marketAddress={initialMarket.market_address}
-          state={initialMarket.state}
           yesBook={yesBook}
           noBook={noBook}
           selectedOutcome={outcome}

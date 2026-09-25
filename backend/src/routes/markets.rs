@@ -39,6 +39,14 @@ async fn query_markets(
 ) -> AppResult<Json<MarketsPage>> {
     let mut page = state.clob.query_markets(&params).await?;
     page.markets = enrich_markets(&state, page.markets).await?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let min_deadline = now.saturating_add(7 * 24 * 60 * 60);
+    page.markets
+        .retain(|market| market.resolution_deadline > min_deadline);
+    page.total = page.markets.len();
     Ok(Json(page))
 }
 

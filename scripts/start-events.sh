@@ -5,9 +5,10 @@
 # 3. USDT on Reth + LP USDT + bridge route
 # 4. Fund maker deposit on LightPool
 # 5. event-contract-app backend + frontend
-# 6. liquidity-maker — bootstrap Polymarket event slug onto LightPool
+# 6. liquidity-maker — bootstrap the hottest Polymarket events onto LightPool
 #
 # Usage:
+#   ./scripts/start-events.sh start
 #   ./scripts/start-events.sh start <polymarket-slug>
 #   ./scripts/start-events.sh stop
 #   ./scripts/start-events.sh clean
@@ -27,9 +28,11 @@ CLOB_HTTP="${LIGHTPOOL_CLOB_INDEX_HTTP:-http://127.0.0.1:3002}"
 CLOB_WS="${LIGHTPOOL_CLOB_INDEX_WS:-ws://127.0.0.1:3002}"
 APP_API="${APP_API:-http://127.0.0.1:3001/api}"
 
-# Whole USDT (6 decimals on chain). Must cover MAX_MARKETS * (MINT_AMOUNT / 1e6).
-MAKER_DEPOSIT_WHOLE="${MAKER_DEPOSIT_WHOLE:-10000000}"
+# Whole USDT (6 decimals on chain). Must cover HOT_EVENTS * MAX_MARKETS * (MINT_AMOUNT / 1e6).
+# 9 events * 4 markets * 1_000_000 USDT = 36_000_000, plus headroom.
+MAKER_DEPOSIT_WHOLE="${MAKER_DEPOSIT_WHOLE:-100000000}"
 USER_TOKEN_WHOLE="${USER_TOKEN_WHOLE:-10000}"
+HOT_EVENTS="${HOT_EVENTS:-9}"
 MAX_MARKETS="${MAX_MARKETS:-4}"
 # Raw units (6 decimals). Default 1e12 = 1_000_000 USDT per market.
 MINT_AMOUNT="${MINT_AMOUNT:-1000000000000}"
@@ -78,21 +81,22 @@ export PATH="${HOME}/.foundry/bin:${PATH:-}"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") start <polymarket-slug>
+Usage: $(basename "$0") start [polymarket-slug]
        $(basename "$0") stop|clean|status|help
 
 Start local Reth, LightPool, indexer, USDT bridge, event-contract app, and
-liquidity-maker. The slug is a Polymarket Gamma event slug (e.g. world-cup-winner);
-liquidity-maker bootstraps matching LightPool event markets for the UI.
+liquidity-maker. With no slug, the top \$HOT_EVENTS Polymarket events by 24-hour
+volume are bootstrapped onto LightPool. An optional slug pins one Gamma event.
 
-  start <slug>   Bring up the stack and bootstrap markets for <slug>
+  start          Bootstrap the hottest \$HOT_EVENTS events (default 9)
+  start <slug>   Bootstrap one Polymarket Gamma event slug
   stop           Stop bot, app, bridge, Reth, node, indexer. Keep data.
   clean          Delete \$DATA only. Does not stop. Run stop first if needed.
   status         Show PIDs
 
 Env:
-  LABS / DATA / MAX_MARKETS / MINT_AMOUNT / HTTPS_PROXY
-  MAKER_DEPOSIT_WHOLE  maker USDT deposited via bridge (default 1000000)
+  LABS / DATA / HOT_EVENTS / MAX_MARKETS / MINT_AMOUNT / HTTPS_PROXY
+  MAKER_DEPOSIT_WHOLE  maker USDT deposited via bridge (default 100000000)
   USER_TOKEN_WHOLE     ERC20 USDT minted to demo user on Reth (default 10000)
 
 Runtime state under \$DATA ($DATA).
@@ -586,7 +590,7 @@ ensure_bot_bin() {
   fi
   need_cmd cargo
   local bin="$BOT_DIR/target/release/liquidity-maker"
-  if [[ ! -x "$bin" ]]; then
+  if [[ ! -x "$bin" ]] || ! "$bin" --help 2>/dev/null | grep -q 'Skips markets resolving within 7 days'; then
     echo "build liquidity-maker (release)" >&2
     (cd "$BOT_DIR" && cargo build --release -p lightpool-strategies --bin liquidity-maker) >&2
   fi
@@ -630,17 +634,115 @@ start_frontend() {
   )
 }
 
+gamma_proxy() {
+  if [[ -n "${HTTPS_PROXY:-}" ]]; then
+    printf '%s\n' "$HTTPS_PROXY"
+  elif [[ -n "${https_proxy:-}" ]]; then
+    printf '%s\n' "$https_proxy"
+  elif [[ -n "${HTTP_PROXY:-}" ]]; then
+    printf '%s\n' "$HTTP_PROXY"
+  elif [[ -n "${http_proxy:-}" ]]; then
+    printf '%s\n' "$http_proxy"
+  else
+    printf '%s\n' "http://127.0.0.1:8118"
+  fi
+}
+
+fetch_hottest_event_slugs() {
+  local limit="$1"
+  local proxy url body
+  proxy="$(gamma_proxy)"
+  local fetch_limit=$((limit * 5))
+  url="https://gamma-api.polymarket.com/events?active=true&closed=false&archived=false&order=volume24hr&ascending=false&limit=${fetch_limit}"
+  echo "fetch hottest $limit Polymarket events (volume24hr) via $proxy" >&2
+  body="$(curl -fsS -x "$proxy" "$url")" || {
+    echo "Polymarket Gamma request failed. Set HTTPS_PROXY and retry." >&2
+    exit 1
+  }
+  printf '%s' "$body" | python3 -c '
+import json, sys
+limit = int(sys.argv[1])
+payload = json.load(sys.stdin)
+events = payload.get("data") if isinstance(payload, dict) else payload
+if not isinstance(events, list):
+    events = []
+from datetime import datetime, timedelta, timezone
+
+def deadline_open(raw):
+    if raw is None or not str(raw).strip():
+        return False
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    if "." in text:
+        head, rest = text.split(".", 1)
+        if "+" in rest:
+            text = head + "+" + rest.split("+", 1)[1]
+        else:
+            text = head + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return False
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt > datetime.now(timezone.utc) + timedelta(days=7)
+
+def has_order_book(market):
+    if market.get("closed"):
+        return False
+    if market.get("enableOrderBook") is False or market.get("acceptingOrders") is False:
+        return False
+    return market.get("bestBid") is not None or market.get("bestAsk") is not None
+
+count = 0
+for event in events:
+    if event.get("closed") or event.get("archived"):
+        continue
+    markets = event.get("markets") or []
+    if markets:
+        if not any(deadline_open(market.get("endDate")) for market in markets):
+            continue
+    elif not deadline_open(event.get("endDate")):
+        continue
+    if markets and not any(has_order_book(market) for market in markets):
+        continue
+    slug = str(event.get("slug") or "").strip()
+    if not slug:
+        continue
+    print(slug)
+    count += 1
+    if count >= limit:
+        break
+if count == 0:
+    raise SystemExit("no active Polymarket events in Gamma response")
+' "$limit"
+}
+
 start_bot() {
-  local slug="$1"
+  local slug="${1:-}"
   local bin lp_usdt
+  local -a slug_args=()
   bin="$(ensure_bot_bin)"
   lp_usdt="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tokens"][0]["lp"])' "$STATE")"
-  printf '%s\n' "$slug" >"$SLUG_FILE"
+  if [[ -n "$slug" ]]; then
+    printf '%s\n' "$slug" >"$SLUG_FILE"
+    slug_args=(--polymarket-slug "$slug")
+    echo "start liquidity-maker --polymarket-slug $slug (bootstrap max $MAX_MARKETS per event)"
+  else
+    local hot slug_line
+    hot="$(fetch_hottest_event_slugs "$HOT_EVENTS")"
+    printf '%s\n' "$hot" >"$SLUG_FILE"
+    while IFS= read -r slug_line; do
+      [[ -n "$slug_line" ]] || continue
+      slug_args+=(--polymarket-slug "$slug_line")
+    done <<<"$hot"
+    echo "start liquidity-maker hottest $HOT_EVENTS events (max $MAX_MARKETS markets each)"
+  fi
   if is_running bot; then
-    echo "restart liquidity-maker (slug=$slug)"
+    echo "restart liquidity-maker"
     stop_pid bot
   fi
-  echo "start liquidity-maker --polymarket-slug $slug (bootstrap max $MAX_MARKETS)"
   (
     cd "$BOT_DIR"
     export LIGHTPOOL_CLOB_INDEX_HTTP="$CLOB_HTTP"
@@ -648,7 +750,7 @@ start_bot() {
     export LIGHTPOOL_COLLATERAL_TOKEN="$lp_usdt"
     export LIGHTPOOL_PRIVATE_KEY="$MAKER_KEY"
     setsid "$bin" \
-      --polymarket-slug "$slug" \
+      "${slug_args[@]}" \
       --bootstrap-markets \
       --max-markets "$MAX_MARKETS" \
       --mint-amount "$MINT_AMOUNT" \
@@ -658,20 +760,20 @@ start_bot() {
   sleep 2
   if ! is_running bot; then
     echo "liquidity-maker exited early; see $LOG_DIR/bot.log" >&2
-    echo "If Polymarket fetch failed, set HTTPS_PROXY and restart: $0 start $slug" >&2
+    echo "If Polymarket fetch failed, set HTTPS_PROXY and restart: $0 start" >&2
     exit 1
   fi
   echo "ok    liquidity-maker (log $LOG_DIR/bot.log)"
 }
 
 print_summary() {
-  local slug="$1"
+  local slug="${1:-}"
   cat <<EOF
 
 === event-contract stack ===
 LABS   $LABS
 DATA   $DATA
-Slug   $slug
+Events $(if [[ -n "$slug" ]]; then printf '%s' "$slug"; else printf 'hottest %s (see %s)' "$HOT_EVENTS" "$SLUG_FILE"; fi)
 UI     http://127.0.0.1:3000
 API    $APP_API
 CLOB   $CLOB_HTTP
@@ -690,8 +792,8 @@ Logs: $LOG_DIR
 Stop: $0 stop
 Clean: $0 clean
 
-Open the UI and trade events bootstrapped from Polymarket slug "$slug".
-If the market list is empty, set HTTPS_PROXY for Polymarket and re-run start with the same slug.
+Open the UI and trade the bootstrapped Polymarket events.
+If the market list is empty, set HTTPS_PROXY for Polymarket and re-run start.
 EOF
   if [[ -f "$STATE" ]]; then
     python3 - "$STATE" "$RETH_RPC" <<'PY'
@@ -789,7 +891,8 @@ status_all() {
   echo "LABS=$LABS"
   echo "DATA=$DATA"
   if [[ -f "$SLUG_FILE" ]]; then
-    echo "SLUG=$(cat "$SLUG_FILE")"
+    echo "EVENTS:"
+    sed 's/^/  /' "$SLUG_FILE"
   fi
   local name
   for name in reth lightpool indexer bridge backend frontend bot; do
@@ -806,11 +909,6 @@ main() {
   case "$cmd" in
     start)
       local slug="${2:-${POLYMARKET_SLUG:-}}"
-      if [[ -z "$slug" ]]; then
-        echo "missing Polymarket event slug" >&2
-        echo "Usage: $(basename "$0") start <polymarket-slug>" >&2
-        exit 1
-      fi
       start_all "$slug"
       ;;
     stop) stop_all ;;

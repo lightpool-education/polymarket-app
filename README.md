@@ -1,73 +1,47 @@
 # Event Contract App
 
-MVP web app for LightPool event contracts.
-
-## Structure
-
-```
-external/event-contract-app/
-├── backend/     Rust (Axum) API + lightpool-sdk
-├── frontend/    Next.js UI
-└── docker-compose.yml
+```bash
+mkdir -p lightpool-labs && cd lightpool-labs
+git clone git@github.com:lightpool-labs/event-contract-app.git
+cd event-contract-app
 ```
 
-## Quick start
+## Step 1
 
-### 1. Postgres (optional for now)
+Install the toolchain. Tools that are already installed are skipped.
 
 ```bash
-docker compose up -d
-psql postgres://event_app:event_app@127.0.0.1:5432/event_contract_app -f backend/migrations/001_init.sql
+./scripts/download-toolchain.sh
 ```
 
-### 2. Backend
+## Step 2
+
+Download the other repositories and build them. Repositories that are already cloned are skipped.
 
 ```bash
-cd external/event-contract-app/backend
-cp .env.example .env
-cargo run
+./scripts/download-and-build.sh
 ```
 
-API: `http://127.0.0.1:3001/api`
+The script clones these repositories next to this app: `lightpool-node`, `lightpool-crypto`, `lightpool-sdk-rust`, `lightpool-clob-indexer`, `lightpool-bridge`, `lightpool-bot`, and `lightpool-tutorials`. It then downloads Reth and builds the node, indexer, bridge, liquidity maker, and app backend.
 
-### 3. Frontend
+## Step 3
+
+Start the local stack.
 
 ```bash
-cd frontend
-cp .env.example .env.local
-npm install
-npm run dev
+./scripts/start-events.sh start
 ```
 
-UI: `http://127.0.0.1:3000`
+Open http://127.0.0.1:3000
 
-### 4. LightPool node
-
-Start a local node on `http://127.0.0.1:26300` (default RPC port).
-
-Check readiness:
+Stop:
 
 ```bash
-curl http://127.0.0.1:3001/api/ready
-curl http://127.0.0.1:3001/api/markets
+./scripts/start-events.sh stop
 ```
 
-## API routes (scaffold)
+Delete runtime data (stop first):
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Liveness |
-| GET | `/api/ready` | Node connectivity |
-| GET | `/api/markets` | List markets |
-| GET | `/api/markets/:id` | Market detail |
-| POST | `/api/orders` | Place order (stub) |
-| POST | `/api/orders/:id/cancel` | Cancel order (stub) |
-| GET | `/api/orders` | List orders |
-| GET | `/api/account/balances` | Balances (stub) |
-
-## Next steps
-
-1. Wire `POST /orders` to `ActionBuilder::place_order` via agent signer
-2. Replace seed data with PostgreSQL + event indexer
-3. Add dev-login / MetaMask auth
-4. Real balance queries via SDK `call` + `get_balance`
+```bash
+./scripts/start-events.sh clean
+```

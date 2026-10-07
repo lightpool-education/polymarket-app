@@ -63,7 +63,7 @@ SLUG_FILE="$DATA/polymarket-slug.txt"
 RETH_DATADIR="$DATA/reth"
 FORGE_DIR="$DATA/forge"
 APP_DIR="${APP_DIR:-$APP_ROOT}"
-BOT_DIR="${BOT_DIR:-$LABS/lightpool-bot}"
+MAKER_DIR="${MAKER_DIR:-$APP_DIR/liquidity-maker}"
 CONTRACTS="$LABS/lightpool-bridge/contracts"
 RETH_BIN="${RETH_BIN:-$LABS/lightpool-node/tools/reth/bin/reth}"
 BRIDGE_BIN="${BRIDGE_BIN:-$LABS/lightpool-bridge/target/release/lightpool-bridge}"
@@ -589,11 +589,10 @@ ensure_bot_bin() {
     return
   fi
   need_cmd cargo
-  local bin="$BOT_DIR/target/release/liquidity-maker"
-  if [[ ! -x "$bin" ]] || ! "$bin" --help 2>/dev/null | grep -q 'Skips markets resolving within 7 days'; then
-    echo "build liquidity-maker (release)" >&2
-    (cd "$BOT_DIR" && cargo build --release -p lightpool-strategies --bin liquidity-maker) >&2
-  fi
+  local bin="$MAKER_DIR/target/release/liquidity-maker"
+  # Always rebuild: mint/place params must match the running lightpool node (e.g. whitelist).
+  echo "build liquidity-maker (release)" >&2
+  (cd "$MAKER_DIR" && cargo build --release --bin liquidity-maker) >&2
   if [[ ! -x "$bin" ]]; then
     echo "bot binary missing after build: $bin" >&2
     exit 1
@@ -744,7 +743,7 @@ start_bot() {
     stop_pid bot
   fi
   (
-    cd "$BOT_DIR"
+    cd "$MAKER_DIR"
     export LIGHTPOOL_CLOB_INDEX_HTTP="$CLOB_HTTP"
     export LIGHTPOOL_CLOB_INDEX_WS="$CLOB_WS"
     export LIGHTPOOL_COLLATERAL_TOKEN="$lp_usdt"

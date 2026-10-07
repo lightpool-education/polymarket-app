@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   useAccount,
   useConnect,
+  useDisconnect,
   useSignMessage,
   useSignTypedData,
 } from "wagmi";
 import { api } from "@/lib/api";
 import { formatAddress } from "@/lib/address";
 import {
+  clearSession,
   getSessionAddress,
   getSessionToken,
   notifySessionChanged,
@@ -28,6 +30,7 @@ export const OPEN_CASH_DEPOSIT_EVENT = "open-cash-deposit";
 export function ConnectWallet() {
   const { address, isConnected } = useAccount();
   const { connectAsync, connectors, isPending } = useConnect();
+  const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const { signTypedDataAsync } = useSignTypedData();
   const router = useRouter();
@@ -37,6 +40,7 @@ export function ConnectWallet() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loginAttemptedFor = useRef<string | null>(null);
+  const skipAutoLogin = useRef(false);
   const [copied, setCopied] = useState(false);
 
   const refreshSession = useCallback(() => {
@@ -101,7 +105,7 @@ export function ConnectWallet() {
       }
       return true;
     } catch (e) {
-      loginAttemptedFor.current = null;
+      // Keep loginAttemptedFor set so rejecting MetaMask does not retry in a loop.
       setError(e instanceof Error ? e.message : "Login failed");
       return false;
     } finally {
@@ -116,7 +120,11 @@ export function ConnectWallet() {
     !!getSessionToken();
 
   useEffect(() => {
-    if (!isConnected || !address || busy || loggedIn) {
+    if (!isConnected || !address) {
+      skipAutoLogin.current = false;
+      return;
+    }
+    if (busy || loggedIn || skipAutoLogin.current) {
       return;
     }
     const key = address.toLowerCase();
@@ -129,6 +137,7 @@ export function ConnectWallet() {
 
   async function onConnectClick() {
     setError(null);
+    skipAutoLogin.current = false;
     try {
       const connector = connectors[0];
       if (!connector) {
@@ -182,6 +191,24 @@ export function ConnectWallet() {
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore
+    }
+  }
+
+  async function onDisconnect() {
+    setError(null);
+    setBusy(true);
+    skipAutoLogin.current = true;
+    loginAttemptedFor.current = address?.toLowerCase() ?? "disconnected";
+    try {
+      await disconnectAsync();
+      clearSession();
+      setSessionAddress(null);
+      setAgentAuthorized(null);
+      notifySessionChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Disconnect failed");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -261,6 +288,14 @@ export function ConnectWallet() {
           onClick={() => void onCopyAddress()}
         >
           {copied ? "Copied" : formatAddress(address)}
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-brand-line px-3 py-1.5 text-xs font-medium text-brand-muted hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+          disabled={busy}
+          onClick={() => void onDisconnect()}
+        >
+          Disconnect
         </button>
       </div>
       {error && (

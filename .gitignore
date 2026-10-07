@@ -4,7 +4,7 @@ node_modules/
 out/
 
 # Rust
-backend/target/
+target/
 
 # Env
 .env

@@ -86,7 +86,7 @@ echo "build lightpool-bridge"
 (cd "$LABS/lightpool-bridge" && cargo build --release --bin lightpool-bridge)
 
 echo "build liquidity-maker"
-(cd "$LABS/lightpool-bot" && cargo build --release -p lightpool-strategies --bin liquidity-maker)
+(cd "$APP_ROOT/liquidity-maker" && cargo build --release --bin liquidity-maker)
 
 echo "build event-contract-app backend"
 (cd "$APP_ROOT/backend" && cargo build --release)
@@ -111,6 +111,6 @@ echo "  reth          $LABS/lightpool-node/tools/reth/bin/reth"
 echo "  lightpool     $LABS/lightpool-node/bin/lightpool"
 echo "  indexer       $LABS/lightpool-clob-indexer/target/release/lightpool-clob-indexer"
 echo "  bridge        $LABS/lightpool-bridge/target/release/lightpool-bridge"
-echo "  maker         $LABS/lightpool-bot/target/release/liquidity-maker"
+echo "  maker         $APP_ROOT/liquidity-maker/target/release/liquidity-maker"
 echo "  backend       $APP_ROOT/backend/target/release/event-contract-backend"
 echo "next: ./scripts/start-events.sh start"

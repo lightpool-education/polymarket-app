@@ -119,6 +119,7 @@ async fn place_order(
         order_type,
         limit_price,
         token_address,
+        whitelist: None,
     };
 
     let response = state

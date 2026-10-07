@@ -199,6 +199,7 @@ impl ChainClient {
             collateral_token,
             yes_token,
             no_token,
+            whitelist: None,
         };
 
         let action = ActionBuilder::mint_event_contract(market_address, params)
@@ -246,6 +247,7 @@ impl ChainClient {
             collateral_token,
             yes_token,
             no_token,
+            whitelist: None,
         };
 
         let action = ActionBuilder::burn_event_contract(market_address, params)

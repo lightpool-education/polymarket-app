@@ -1,6 +1,6 @@
 # Event Contract App
 
-event-contract-app implements a Polymarket-style CLOB for event contracts on LightPool—trade Yes/No outcome shares on an on-chain order book, with CEX-smooth trading, no wallet popups on every order, and support for high-frequency bot trading.
+event-contract-app implements a Polymarket-style CLOB for event contracts on LightPool—trade Yes/No outcome shares on an on-chain order book, with CEX-smooth trading, no wallet popups on every order, and support for high-frequency bot trading. Educational use only — not for production.
 
 ```bash
 mkdir -p lightpool-labs && cd lightpool-labs
